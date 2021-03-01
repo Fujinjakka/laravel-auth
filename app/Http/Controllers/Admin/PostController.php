@@ -4,9 +4,20 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Post;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use App\Mail\PostMail;
+use Illuminate\Support\Facades\Mail;
 
 class PostController extends Controller
 {
+    protected $validation = [
+        'title' => 'required|max:100',
+        'body' => 'required',
+        'img:path' => 'image'
+    ];
     /**
      * Display a listing of the resource.
      *
@@ -14,7 +25,9 @@ class PostController extends Controller
      */
     public function index()
     {
-        //
+        $posts = Post::where('user_id', Auth::id())->get();
+
+        return view('admin.posts.index', compact('posts'));
     }
 
     /**
@@ -24,7 +37,7 @@ class PostController extends Controller
      */
     public function create()
     {
-        //
+        return view('admin.posts.create');
     }
 
     /**
@@ -35,7 +48,27 @@ class PostController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $data = $request->all();
+        $request->validate($this->validation);
+        
+        $newPost = new Post();
+        $data['user_id'] = Auth::id();
+        $data['slug'] = Str::slug($data['title']);
+
+        if(!empty($data['img_path'])) {
+            $data['img_path'] = Storage::disk('public')->put('img', $data['img_path']);
+        }
+
+        
+        $newPost->fill($data);
+        $newPost->save();
+        
+        if ($newPost->save()) {
+            Mail::to('mail@mail.it')->send(new PostMail($newPost));
+        }
+
+        return redirect()->route('admin.posts.index');
+
     }
 
     /**
